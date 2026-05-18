@@ -1,0 +1,54 @@
+name: Retrain
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  check-drift-and-retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build services
+        run: docker compose build mlflow-server drift-monitor trainer
+
+      - name: Start MLflow and drift monitor
+        run: docker compose up -d mlflow-server drift-monitor
+
+      - name: Wait for drift monitor
+        run: |
+          for i in {1..30}; do
+            curl -sf http://localhost:8001/health && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Fetch drift report
+        id: drift
+        run: |
+          report=$(curl -sf http://localhost:8001/drift-report)
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+          echo "$report" | jq -e '.drift_detected == true'
+
+      - name: Run trainer
+        if: steps.drift.outcome == 'success'
+        run: docker compose run --rm trainer
+
+      - name: Open issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Retraining failed on ${context.sha.slice(0, 7)}`,
+              body: `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['mlops', 'automated']
+            })
+
+      - name: Tear down
+        if: always()
+        run: docker compose down

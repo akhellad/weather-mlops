@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, trainer, drift_monitor]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Sync dependencies
+        working-directory: services/${{ matrix.service }}
+        run: uv sync --extra dev
+
+      - name: Ruff
+        working-directory: services/${{ matrix.service }}
+        run: uv run ruff check .
+
+      - name: Pytest
+        working-directory: services/${{ matrix.service }}
+        run: uv run pytest ../../tests/${{ matrix.service }}

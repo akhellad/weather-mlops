@@ -1,0 +1,16 @@
+stages:
+  ingest:
+    cmd: python pipelines/ingest.py
+    deps:
+      - pipelines/ingest.py
+    outs:
+      - data/raw/era5.parquet
+
+  prepare:
+    cmd: python pipelines/prepare.py
+    deps:
+      - pipelines/prepare.py
+      - data/raw/era5.parquet
+    outs:
+      - data/processed/reference.parquet
+      - data/processed/current.parquet
