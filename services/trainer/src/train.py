@@ -6,11 +6,6 @@ import logging
 import os
 import sys
 from pathlib import Path
-from xmlrpc import client
-
-from sklearn import metrics
-
-from sklearn import metrics
 
 import mlflow
 import mlflow.xgboost

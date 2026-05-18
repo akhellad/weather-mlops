@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import logging
+import re
 from dataclasses import dataclass
 
 import pandas as pd
@@ -11,6 +11,8 @@ from evidently import Report
 from evidently.presets import DataDriftPreset
 
 log = logging.getLogger(__name__)
+
+_VALUE_DRIFT_RE = re.compile(r"ValueDrift\(column=([^,]+),method=([^,]+),threshold=([\d.]+)\)")
 
 
 @dataclass
@@ -21,11 +23,6 @@ class DriftSummary:
     n_drifted: int
     threshold: float
     per_column: dict[str, dict[str, float | bool]]
-
-
-import re
-
-_VALUE_DRIFT_RE = re.compile(r"ValueDrift\(column=([^,]+),method=([^,]+),threshold=([\d.]+)\)")
 
 
 def _extract_summary(report_dict: dict, threshold: float) -> DriftSummary:
