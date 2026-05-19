@@ -25,6 +25,9 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
+      - name: Create empty .env for compose
+        run: touch .env
+
       - name: Write GCP service account key
         run: |
           mkdir -p secrets
