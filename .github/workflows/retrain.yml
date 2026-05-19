@@ -6,49 +6,90 @@ on:
     - cron: "0 6 * * *"
 
 jobs:
-  check-drift-and-retrain:
+  retrain:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build services
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Write GCP service account key
+        run: |
+          mkdir -p secrets
+          echo '${{ secrets.GCP_SA_KEY }}' > secrets/gcp_key.json
+          chmod 600 secrets/gcp_key.json
+
+      - name: Run data pipeline (ingest + prepare)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/secrets/gcp_key.json
+          BQ_PROJECT_ID: ${{ secrets.BQ_PROJECT_ID }}
+        run: |
+          uv run python pipelines/ingest.py
+          uv run python pipelines/prepare.py
+
+      - name: Build Docker images
         run: docker compose build mlflow-server drift-monitor trainer
 
       - name: Start MLflow and drift monitor
-        run: docker compose up -d mlflow-server drift-monitor
-
-      - name: Wait for drift monitor
         run: |
+          docker compose up -d mlflow-server drift-monitor
           for i in {1..30}; do
-            curl -sf http://localhost:8001/health && exit 0
+            curl -sf http://localhost:5000/health > /dev/null && \
+            curl -sf http://localhost:8001/health > /dev/null && break
             sleep 2
           done
-          exit 1
 
       - name: Fetch drift report
         id: drift
         run: |
           report=$(curl -sf http://localhost:8001/drift-report)
-          echo "report=$report" >> "$GITHUB_OUTPUT"
-          echo "$report" | jq -e '.drift_detected == true'
+          echo "Report: $report"
+          drift=$(echo "$report" | python3 -c "import json,sys; print(json.load(sys.stdin)['drift_detected'])")
+          echo "drift_detected=$drift" >> "$GITHUB_OUTPUT"
 
-      - name: Run trainer
-        if: steps.drift.outcome == 'success'
-        run: docker compose run --rm trainer
+      - name: Run trainer (if drift detected)
+        if: steps.drift.outputs.drift_detected == 'True'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_HOST: ${{ github.workspace }}/secrets/gcp_key.json
+        run: |
+          docker compose --profile jobs run --rm trainer
 
-      - name: Open issue on failure
-        if: failure()
+      - name: No drift, no retrain
+        if: steps.drift.outputs.drift_detected == 'False'
+        run: echo "No significant drift detected. Skipping retraining."
+
+      - name: Open issue on retrain rejection
+        if: failure() && steps.drift.outputs.drift_detected == 'True'
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Retraining failed on ${context.sha.slice(0, 7)}`,
-              body: `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              labels: ['mlops', 'automated']
+              title: `Retraining rejected on ${context.sha.substring(0, 7)}`,
+              body: [
+                `The drift monitor detected drift but the newly trained model did not beat the current production model.`,
+                `The incumbent model remains active.`,
+                ``,
+                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n'),
+              labels: ['mlops', 'retrain-rejected']
             })
 
       - name: Tear down
         if: always()
-        run: docker compose down
+        run: docker compose --profile jobs down -v
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -f secrets/gcp_key.json
