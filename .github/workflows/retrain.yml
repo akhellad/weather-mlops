@@ -11,6 +11,8 @@ jobs:
     permissions:
       contents: read
       issues: write
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS_HOST: ${{ github.workspace }}/secrets/gcp_key.json
     steps:
       - uses: actions/checkout@v4
 
@@ -59,8 +61,6 @@ jobs:
 
       - name: Run trainer (if drift detected)
         if: steps.drift.outputs.drift_detected == 'True'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_HOST: ${{ github.workspace }}/secrets/gcp_key.json
         run: |
           docker compose --profile jobs run --rm trainer
 
