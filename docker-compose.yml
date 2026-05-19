@@ -22,7 +22,9 @@ services:
   api:
     build:
       context: ./services/api
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       MLFLOW_TRACKING_URI: http://mlflow-server:5000
       DRIFT_REFERENCE_PATH: /data/processed/reference.parquet
@@ -36,7 +38,9 @@ services:
   drift-monitor:
     build:
       context: ./services/drift_monitor
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       DRIFT_REFERENCE_PATH: /data/processed/reference.parquet
       DRIFT_CURRENT_PATH: /data/processed/current.parquet
@@ -48,7 +52,9 @@ services:
   trainer:
     build:
       context: ./services/trainer
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       MLFLOW_TRACKING_URI: http://mlflow-server:5000
       TRAIN_REFERENCE_PATH: /data/processed/reference.parquet
