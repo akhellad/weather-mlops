@@ -1,44 +1,66 @@
 services:
   mlflow-server:
-    image: ghcr.io/mlflow/mlflow:v2.18.0
+    image: ghcr.io/mlflow/mlflow:v3.11.1
     command: >
       mlflow server
       --host 0.0.0.0
       --port 5000
       --backend-store-uri sqlite:////mlflow/mlflow.db
-      --default-artifact-root /mlflow/artifacts
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts
+      --allowed-hosts "mlflow-server:*,localhost:*,127.0.0.1:*"
     ports:
       - "5000:5000"
     volumes:
       - mlflow-data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   api:
     build:
       context: ./services/api
     env_file: .env
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+      DRIFT_REFERENCE_PATH: /data/processed/reference.parquet
+      DRIFT_CURRENT_PATH: /data/processed/current.parquet
     ports:
       - "8000:8000"
     depends_on:
-      - mlflow-server
+      mlflow-server:
+        condition: service_healthy
 
   drift-monitor:
     build:
       context: ./services/drift_monitor
     env_file: .env
+    environment:
+      DRIFT_REFERENCE_PATH: /data/processed/reference.parquet
+      DRIFT_CURRENT_PATH: /data/processed/current.parquet
     ports:
       - "8001:8001"
     volumes:
-      - ./data:/data
+      - ./data:/data:ro
 
   trainer:
     build:
       context: ./services/trainer
     env_file: .env
-    profiles: ["jobs"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+      TRAIN_REFERENCE_PATH: /data/processed/reference.parquet
+      TRAIN_CURRENT_PATH: /data/processed/current.parquet
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp_key.json
     volumes:
-      - ./data:/data
+      - ./data:/data:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS_HOST}:/run/secrets/gcp_key.json:ro
+    profiles: ["jobs"]
     depends_on:
-      - mlflow-server
+      mlflow-server:
+        condition: service_healthy
 
 volumes:
   mlflow-data:

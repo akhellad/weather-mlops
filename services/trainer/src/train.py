@@ -24,7 +24,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("trainer")
 
-TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "file:./mlruns")
+TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
 EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "weather-temperature")
 MODEL_NAME = os.environ.get("MODEL_NAME", "weather-xgb-temperature")
 DECISION_METRIC = "rmse_test"

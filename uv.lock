@@ -4512,7 +4512,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-cloud-bigquery", specifier = ">=3.25" },
     { name = "google-cloud-bigquery-storage", specifier = ">=2.27" },
-    { name = "mlflow", specifier = ">=2.18" },
+    { name = "mlflow", specifier = ">=3.11,<4" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=17" },

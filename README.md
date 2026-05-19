@@ -1,33 +1,8 @@
-# era5-mlops
-
-End-to-end MLOps pipeline for next-day temperature prediction from ERA5 data.
-
-## Stack
-
-- **MLflow** — tracking + model registry
-- **FastAPI** — serving with hot model reload
-- **Evidently** — data drift detection
-- **XGBoost** — regression model
-- **DVC** — data versioning (local remote)
-- **Docker Compose** — local orchestration
-- **GitHub Actions** — CI + automated retraining
-
-## Architecture
-
-```
-GitHub Actions ──────► drift-monitor (/drift-report)
-       │                      │
-       │ if drift             ▼
-       └──────────────► trainer ──► MLflow Registry
-                                         │
-                                         ▼
-                                       api (hot reload)
-```
-
 ## Local setup
 
 ```bash
 cp .env.example .env
+# Edit .env to set GOOGLE_APPLICATION_CREDENTIALS to your GCP service account JSON
 docker compose up -d mlflow-server api drift-monitor
 ```
 
@@ -55,13 +30,20 @@ dvc repro
 ## Retraining logic
 
 1. `drift-monitor` exposes `/drift-report` based on Evidently comparison between reference and current data
-2. GitHub Actions polls the endpoint (or is triggered via `workflow_dispatch`)
+2. GitHub Actions polls the endpoint (scheduled or via `workflow_dispatch`)
 3. If drift is detected, the `trainer` container is launched
-4. New model is logged to MLflow and compared against the current `Production` model
-5. Better RMSE → promoted to `Production`, API reloads automatically
-6. Worse RMSE → job fails, current model stays, an issue is opened
+4. The new model is logged to MLflow and compared against the current `production` alias
+5. Better RMSE → promoted to `production` via alias swap; API reloads the model without restart
+6. Worse RMSE → the workflow fails, the incumbent stays, an issue is opened automatically
 
 ## Drift simulation
 
-Drift is simulated by injecting out-of-season data into the current dataset.
-See `services/drift_monitor/src/simulator.py`.
+Drift is simulated by injecting a deterministic seasonal shift (+6°C temperature, +4°C dew point, ×1.6 precipitation) into the current dataset, with a fixed seed for reproducibility. See `services/drift_monitor/src/simulator.py`.
+
+## Testing
+
+```bash
+uv run pytest
+```
+
+The test suite is fully isolated: no external services, no MLflow server, no parquets required.

@@ -18,12 +18,20 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("drift-monitor")
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+def _default_data_path(filename: str) -> str:
+    try:
+        root = Path(__file__).resolve().parents[3]
+    except IndexError:
+        return f"data/processed/{filename}"
+    return str(root / "data" / "processed" / filename)
+
+
 REFERENCE_PATH = Path(
-    os.environ.get("DRIFT_REFERENCE_PATH", str(PROJECT_ROOT / "data/processed/reference.parquet"))
+    os.environ.get("DRIFT_REFERENCE_PATH", _default_data_path("reference.parquet"))
 )
 CURRENT_PATH = Path(
-    os.environ.get("DRIFT_CURRENT_PATH", str(PROJECT_ROOT / "data/processed/current.parquet"))
+    os.environ.get("DRIFT_CURRENT_PATH", _default_data_path("current.parquet"))
 )
 THRESHOLD = float(os.environ.get("DRIFT_THRESHOLD", "0.3"))
 SIMULATE_DRIFT = os.environ.get("DRIFT_SIMULATE", "true").lower() == "true"

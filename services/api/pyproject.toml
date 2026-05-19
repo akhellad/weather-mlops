@@ -9,6 +9,7 @@ dependencies = [
     "xgboost>=2.1",
     "pandas>=2.2",
     "pydantic>=2.9",
+    "mlflow>=3.11,<4",
 ]
 
 [project.optional-dependencies]

@@ -8,6 +8,7 @@ dependencies = [
     "evidently>=0.4.40",
     "pandas>=2.2",
     "pyarrow>=17",
+    "mlflow>=3.11,<4",
 ]
 
 [project.optional-dependencies]

@@ -11,4 +11,6 @@ COPY src ./src
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+ENV GIT_PYTHON_REFRESH=quiet
+
 ENTRYPOINT ["python", "-m", "src.train"]
